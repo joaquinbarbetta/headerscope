@@ -1,5 +1,7 @@
 # HeaderScope
 
+**Live demo: [headerscope.vercel.app](https://headerscope.vercel.app)**
+
 **Scan any website's HTTP security headers, get a grade, and learn exactly how to fix what's missing.**
 
 HeaderScope sends a single request to a URL, follows its redirects, and audits the response headers against current best practices (OWASP Secure Headers Project, MDN, Mozilla Observatory). Every finding comes with an explanation, a recommendation and a copy-pasteable example.
