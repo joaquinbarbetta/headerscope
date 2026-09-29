@@ -1,3 +1,5 @@
+import type { Locale, Message } from "@/lib/i18n";
+
 export type Status = "pass" | "warn" | "fail" | "info";
 
 export type Category = "transport" | "content" | "framing" | "privacy" | "cookies" | "disclosure";
@@ -23,7 +25,20 @@ export interface CheckResult {
   weight: number;
   /** Link to reference documentation. */
   reference: string;
+  /** Language-neutral form of the texts above, so clients can re-render them in any locale. */
+  messages: CheckMessages;
 }
+
+export interface CheckMessages {
+  title: Message;
+  summary: Message;
+  details: Message[];
+  recommendation?: Message;
+}
+
+/** What a check produces before localization: messages instead of strings. */
+export type RawCheckResult = Omit<CheckResult, "title" | "summary" | "details" | "recommendation" | "messages"> &
+  CheckMessages;
 
 /** Lower-cased header name → value. `set-cookie` is always an array. */
 export type HeaderMap = Record<string, string | string[] | undefined>;
@@ -53,6 +68,8 @@ export interface FetchResult {
 
 export interface ScanReport {
   url: string;
+  /** Locale of the human-readable strings in `checks`. */
+  lang: Locale;
   finalUrl: string;
   status: number;
   scannedAt: string;

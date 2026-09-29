@@ -1,3 +1,5 @@
+import { msg, type Message } from "@/lib/i18n";
+
 /** Minimal Content-Security-Policy parser (CSP Level 3 syntax). */
 export type CspDirectives = Map<string, string[]>;
 
@@ -24,7 +26,7 @@ const NONCE_OR_HASH = /^'(nonce-|sha256-|sha384-|sha512-)/;
 
 export interface CspIssue {
   severity: "major" | "minor";
-  message: string;
+  message: Message;
 }
 
 export function auditCsp(csp: CspDirectives): CspIssue[] {
@@ -34,7 +36,7 @@ export function auditCsp(csp: CspDirectives): CspIssue[] {
   if (!script) {
     issues.push({
       severity: "major",
-      message: "No script-src or default-src directive: scripts can load from anywhere.",
+      message: msg("check.csp.issue.noScriptSrc"),
     });
   } else {
     const hasNonceOrHash = script.some((s) => NONCE_OR_HASH.test(s));
@@ -44,13 +46,13 @@ export function auditCsp(csp: CspDirectives): CspIssue[] {
     if (script.includes("'unsafe-inline'") && !hasNonceOrHash) {
       issues.push({
         severity: "major",
-        message: "'unsafe-inline' allows inline scripts, which defeats most XSS protection.",
+        message: msg("check.csp.issue.unsafeInline"),
       });
     }
     if (script.includes("'unsafe-eval'")) {
       issues.push({
         severity: "major",
-        message: "'unsafe-eval' allows eval() and similar, a common XSS sink.",
+        message: msg("check.csp.issue.unsafeEval"),
       });
     }
     if (!strictDynamic) {
@@ -58,7 +60,7 @@ export function auditCsp(csp: CspDirectives): CspIssue[] {
       if (broad.length > 0) {
         issues.push({
           severity: "major",
-          message: `Overly broad script sources: ${broad.join(" ")}.`,
+          message: msg("check.csp.issue.broad", { sources: broad.join(" ") }),
         });
       }
     }
@@ -68,13 +70,13 @@ export function auditCsp(csp: CspDirectives): CspIssue[] {
   if (!csp.has("object-src") && !defaultNone) {
     issues.push({
       severity: "minor",
-      message: "No object-src directive. Consider object-src 'none' to block plugins.",
+      message: msg("check.csp.issue.noObjectSrc"),
     });
   }
   if (!csp.has("base-uri")) {
     issues.push({
       severity: "minor",
-      message: "No base-uri directive. Consider base-uri 'self' to prevent <base> tag injection.",
+      message: msg("check.csp.issue.noBaseUri"),
     });
   }
   return issues;

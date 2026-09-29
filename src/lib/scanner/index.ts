@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 import { runChecks } from "./checks";
 import { fetchHeaders, type FetchOptions } from "./fetcher";
 import type { CheckResult, FetchResult, ScanReport, Status } from "./types";
@@ -21,8 +22,8 @@ export function gradeFor(score: number): string {
   return "F";
 }
 
-export function buildReport(input: string, r: FetchResult): ScanReport {
-  const checks = runChecks(r);
+export function buildReport(input: string, r: FetchResult, locale: Locale = DEFAULT_LOCALE): ScanReport {
+  const checks = runChecks(r, locale);
   const score = computeScore(checks);
   const counts: Record<Status, number> = { pass: 0, warn: 0, fail: 0, info: 0 };
   for (const c of checks) counts[c.status]++;
@@ -34,6 +35,7 @@ export function buildReport(input: string, r: FetchResult): ScanReport {
 
   return {
     url: input,
+    lang: locale,
     finalUrl: r.finalUrl,
     status: r.status,
     scannedAt: new Date().toISOString(),
@@ -48,9 +50,9 @@ export function buildReport(input: string, r: FetchResult): ScanReport {
   };
 }
 
-export async function scan(input: string, options?: FetchOptions): Promise<ScanReport> {
+export async function scan(input: string, options?: FetchOptions, locale: Locale = DEFAULT_LOCALE): Promise<ScanReport> {
   const result = await fetchHeaders(input, options);
-  return buildReport(input, result);
+  return buildReport(input, result, locale);
 }
 
 export { TargetError } from "./ssrf";

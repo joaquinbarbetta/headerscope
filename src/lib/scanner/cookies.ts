@@ -1,3 +1,5 @@
+import { msg, type Message } from "@/lib/i18n";
+
 export interface ParsedCookie {
   name: string;
   secure: boolean;
@@ -24,17 +26,17 @@ export function parseSetCookie(header: string): ParsedCookie {
 }
 
 /** Problems with a single cookie. `https` = whether the site is served over TLS. */
-export function cookieProblems(c: ParsedCookie, https: boolean): { critical: string[]; minor: string[] } {
-  const critical: string[] = [];
-  const minor: string[] = [];
+export function cookieProblems(c: ParsedCookie, https: boolean): { critical: Message[]; minor: Message[] } {
+  const critical: Message[] = [];
+  const minor: Message[] = [];
 
-  if (https && !c.secure) critical.push("missing Secure");
-  if (c.sameSite === "none" && !c.secure) critical.push("SameSite=None without Secure (browsers reject it)");
+  if (https && !c.secure) critical.push(msg("check.cookies.problem.missingSecure"));
+  if (c.sameSite === "none" && !c.secure) critical.push(msg("check.cookies.problem.sameSiteNone"));
   if (c.name.startsWith("__Host-") || c.name.startsWith("__Secure-")) {
-    if (!c.secure) critical.push(`${c.name.split("-")[0]}- prefix requires Secure`);
+    if (!c.secure) critical.push(msg("check.cookies.problem.prefix", { prefix: `${c.name.split("-")[0]}-` }));
   }
-  if (!c.httpOnly) minor.push("missing HttpOnly");
-  if (c.sameSite === null) minor.push("no SameSite attribute");
+  if (!c.httpOnly) minor.push(msg("check.cookies.problem.missingHttpOnly"));
+  if (c.sameSite === null) minor.push(msg("check.cookies.problem.noSameSite"));
 
   return { critical, minor };
 }

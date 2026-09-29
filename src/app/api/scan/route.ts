@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE, isLocale, msg, translate, type Locale, type Message } from "@/lib/i18n";
+import { scanErrorMessage } from "@/lib/i18n/errors";
 import { rateLimit } from "@/lib/rate-limit";
 import { TargetError, scan } from "@/lib/scanner";
 
@@ -7,55 +9,41 @@ function clientIp(request: Request): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0].trim() || request.headers.get("x-real-ip") || "unknown";
 }
 
-function friendlyError(err: unknown): string {
-  if (err instanceof TargetError) return err.message;
-  const e = err as NodeJS.ErrnoException;
-  switch (e?.code) {
-    case "ENOTFOUND":
-    case "EAI_AGAIN":
-      return "Domain not found. Check the spelling.";
-    case "ECONNREFUSED":
-      return "The server refused the connection.";
-    case "ECONNRESET":
-      return "The server closed the connection.";
-    case "CERT_HAS_EXPIRED":
-      return "The site's TLS certificate has expired.";
-    case "DEPTH_ZERO_SELF_SIGNED_CERT":
-    case "SELF_SIGNED_CERT_IN_CHAIN":
-      return "The site uses a self-signed TLS certificate.";
-    case "ERR_TLS_CERT_ALTNAME_INVALID":
-      return "The TLS certificate doesn't match this domain.";
-    case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
-      return "The TLS certificate chain is incomplete.";
-  }
-  if (e?.message?.startsWith("Timed out")) return e.message;
-  return "Could not reach the site.";
+/** `error` is ready to display; `message` lets clients re-render it in another locale. */
+function errorResponse(lang: Locale, message: Message, init: ResponseInit) {
+  return Response.json({ error: translate(lang, message), message }, init);
 }
 
 export async function POST(request: Request) {
+  let body: { url?: unknown; lang?: unknown } | null = null;
+  try {
+    body = await request.json();
+  } catch {
+    // Reported below, once we know which language to answer in.
+  }
+  const lang = isLocale(body?.lang) ? body.lang : DEFAULT_LOCALE;
+
   const limit = rateLimit(clientIp(request));
   if (!limit.ok) {
-    return Response.json(
-      { error: `Too many scans. Try again in ${limit.retryAfter}s.` },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
-    );
+    return errorResponse(lang, msg("error.rateLimited", { seconds: limit.retryAfter }), {
+      status: 429,
+      headers: { "Retry-After": String(limit.retryAfter) },
+    });
   }
 
-  let url: unknown;
-  try {
-    ({ url } = await request.json());
-  } catch {
-    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+  if (body === null || typeof body !== "object") {
+    return errorResponse(lang, msg("error.invalidJson"), { status: 400 });
   }
-  if (typeof url !== "string") {
-    return Response.json({ error: "Body must be { \"url\": string }." }, { status: 400 });
+  const { url } = body;
+  if (typeof url !== "string" || (body.lang !== undefined && !isLocale(body.lang))) {
+    return errorResponse(lang, msg("error.invalidBody"), { status: 400 });
   }
 
   try {
-    const report = await scan(url);
+    const report = await scan(url, undefined, lang);
     return Response.json(report);
   } catch (err) {
     const status = err instanceof TargetError ? 400 : 502;
-    return Response.json({ error: friendlyError(err) }, { status });
+    return errorResponse(lang, scanErrorMessage(err), { status });
   }
 }

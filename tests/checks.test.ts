@@ -11,6 +11,7 @@ import {
   runChecks,
 } from "@/lib/scanner/checks";
 import { buildReport, computeScore, gradeFor } from "@/lib/scanner";
+import { msg } from "@/lib/i18n";
 import { HARDENED, fakeResult } from "./helpers";
 
 describe("HSTS", () => {
@@ -154,10 +155,18 @@ describe("Scoring", () => {
     expect(gradeFor(computeScore(checks))).toBe("F");
   });
   it("excludes info checks from the score", () => {
+    const stub = {
+      title: "",
+      category: "content" as const,
+      summary: "",
+      details: [],
+      reference: "",
+      messages: { title: msg("check.csp.title"), summary: msg("check.csp.strong"), details: [] },
+    };
     expect(
       computeScore([
-        { id: "a", title: "", category: "content", status: "pass", summary: "", details: [], weight: 10, reference: "" },
-        { id: "b", title: "", category: "content", status: "info", summary: "", details: [], weight: 0, reference: "" },
+        { ...stub, id: "a", status: "pass", weight: 10 },
+        { ...stub, id: "b", status: "info", weight: 0 },
       ]),
     ).toBe(100);
   });

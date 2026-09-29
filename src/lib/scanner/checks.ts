@@ -1,6 +1,7 @@
+import { DEFAULT_LOCALE, msg, translate, type Locale, type Message } from "@/lib/i18n";
 import { auditCsp, parseCsp } from "./csp";
 import { cookieProblems, parseSetCookie } from "./cookies";
-import type { CheckResult, FetchResult, HeaderMap } from "./types";
+import type { CheckResult, FetchResult, HeaderMap, RawCheckResult } from "./types";
 
 const MDN = "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/";
 const SIX_MONTHS = 15_552_000;
@@ -17,79 +18,111 @@ function getSetCookies(h: HeaderMap): string[] {
   return Array.isArray(v) ? v : [v];
 }
 
-type Check = (r: FetchResult) => CheckResult | null;
+type RawCheck = (r: FetchResult) => RawCheckResult | null;
+export type Check = (r: FetchResult, locale?: Locale) => CheckResult | null;
+
+/** Render a check's messages into strings for `locale`, keeping the messages alongside. */
+export function localizeCheck(raw: RawCheckResult, locale: Locale): CheckResult {
+  const { title, summary, details, recommendation, ...rest } = raw;
+  const t = (m: Message) => translate(locale, m);
+  return {
+    ...rest,
+    title: t(title),
+    summary: t(summary),
+    details: details.map(t),
+    recommendation: recommendation && t(recommendation),
+    messages: { title, summary, details, recommendation },
+  };
+}
+
+function localized(check: RawCheck): Check {
+  return (r, locale = DEFAULT_LOCALE) => {
+    const raw = check(r);
+    return raw && localizeCheck(raw, locale);
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Transport
 // ---------------------------------------------------------------------------
 
-export const checkHttps: Check = (r) => {
+const https: RawCheck = (r) => {
   const isHttps = r.finalUrl.startsWith("https:");
   const base = {
     id: "https",
-    title: "HTTPS",
+    title: msg("check.https.title"),
     category: "transport" as const,
     weight: 20,
     reference: "https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/TLS",
   };
   if (isHttps) {
-    const details =
-      r.requestedProtocol === "http:" ? ["Plain HTTP request was redirected to HTTPS."] : [];
-    return { ...base, status: "pass", summary: "Site is served over HTTPS.", details };
+    const details = r.requestedProtocol === "http:" ? [msg("check.https.upgraded")] : [];
+    return { ...base, status: "pass", summary: msg("check.https.pass"), details };
   }
   return {
     ...base,
     status: "fail",
-    summary: "Site is served over plain HTTP.",
-    details: ["Traffic can be read and modified by anyone on the network path."],
-    recommendation: "Serve the site over HTTPS and redirect all HTTP requests to it (301).",
+    summary: msg("check.https.fail"),
+    details: [msg("check.https.failDetail")],
+    recommendation: msg("check.https.failRec"),
   };
 };
 
-export const checkTls: Check = (r) => {
+const tls: RawCheck = (r) => {
   if (!r.tls) return null;
   const base = {
     id: "tls",
-    title: "TLS & certificate",
+    title: msg("check.tls.title"),
     category: "transport" as const,
     weight: 10,
     reference: "https://ssl-config.mozilla.org/",
   };
-  const details: string[] = [];
-  if (r.tls.protocol) details.push(`Protocol: ${r.tls.protocol}`);
-  if (r.tls.issuer) details.push(`Issuer: ${r.tls.issuer}`);
-  if (r.tls.validTo) details.push(`Expires: ${r.tls.validTo}`);
+  const details: Message[] = [];
+  if (r.tls.protocol) details.push(msg("check.tls.protocol", { protocol: r.tls.protocol }));
+  if (r.tls.issuer) details.push(msg("check.tls.issuer", { issuer: r.tls.issuer }));
+  if (r.tls.validTo) details.push(msg("check.tls.expires", { date: r.tls.validTo }));
 
   const legacy = r.tls.protocol && /^(SSLv|TLSv1(\.[01])?$)/.test(r.tls.protocol);
   if (legacy) {
     return {
       ...base,
       status: "fail",
-      summary: `Negotiated a deprecated protocol (${r.tls.protocol}).`,
+      summary: msg("check.tls.legacy", { protocol: r.tls.protocol! }),
       details,
-      recommendation: "Disable TLS 1.0/1.1 and enable TLS 1.2 and 1.3.",
+      recommendation: msg("check.tls.legacyRec"),
     };
   }
   const days = r.tls.daysRemaining;
   if (days !== undefined && days < 0) {
-    return { ...base, status: "fail", summary: "Certificate has expired.", details, recommendation: "Renew the certificate." };
+    return {
+      ...base,
+      status: "fail",
+      summary: msg("check.tls.expired"),
+      details,
+      recommendation: msg("check.tls.expiredRec"),
+    };
   }
   if (days !== undefined && days < 14) {
     return {
       ...base,
       status: "warn",
-      summary: `Certificate expires in ${days} day${days === 1 ? "" : "s"}.`,
+      summary: msg("check.tls.expiring", { days }),
       details,
-      recommendation: "Renew the certificate soon, or automate renewal (e.g. Let's Encrypt + certbot).",
+      recommendation: msg("check.tls.expiringRec"),
     };
   }
-  return { ...base, status: "pass", summary: `Modern TLS${days !== undefined ? `, certificate valid for ${days} more days` : ""}.`, details };
+  return {
+    ...base,
+    status: "pass",
+    summary: days !== undefined ? msg("check.tls.passDays", { days }) : msg("check.tls.pass"),
+    details,
+  };
 };
 
-export const checkHsts: Check = (r) => {
+const hsts: RawCheck = (r) => {
   const base = {
     id: "hsts",
-    title: "Strict-Transport-Security",
+    title: msg("check.hsts.title"),
     category: "transport" as const,
     weight: 15,
     reference: MDN + "Strict-Transport-Security",
@@ -99,9 +132,9 @@ export const checkHsts: Check = (r) => {
     return {
       ...base,
       status: "fail",
-      summary: "HSTS requires HTTPS.",
-      details: ["Browsers ignore HSTS sent over plain HTTP."],
-      recommendation: "Enable HTTPS first, then send HSTS.",
+      summary: msg("check.hsts.requiresHttps"),
+      details: [msg("check.hsts.requiresHttpsDetail")],
+      recommendation: msg("check.hsts.requiresHttpsRec"),
     };
   }
   const value = getHeader(r.headers, "strict-transport-security");
@@ -109,28 +142,28 @@ export const checkHsts: Check = (r) => {
     return {
       ...base,
       status: "fail",
-      summary: "Header is missing.",
-      details: ["Without HSTS, a first visit over HTTP can be intercepted (SSL stripping)."],
-      recommendation: "Send HSTS with a max-age of at least 6 months (ideally 2 years).",
+      summary: msg("check.missing"),
+      details: [msg("check.hsts.missingDetail")],
+      recommendation: msg("check.hsts.missingRec"),
     };
   }
   const directives = value.toLowerCase().split(";").map((d) => d.trim());
   const maxAgeRaw = directives.find((d) => d.startsWith("max-age"))?.split("=")[1]?.replace(/"/g, "");
   const maxAge = maxAgeRaw !== undefined ? Number.parseInt(maxAgeRaw, 10) : NaN;
-  const details: string[] = [];
+  const details: Message[] = [];
   const sub = directives.includes("includesubdomains");
   const preload = directives.includes("preload");
-  details.push(sub ? "Covers subdomains (includeSubDomains)." : "Does not cover subdomains.");
-  if (preload) details.push("Marked for browser preload lists.");
+  details.push(sub ? msg("check.hsts.subdomains") : msg("check.hsts.noSubdomains"));
+  if (preload) details.push(msg("check.hsts.preload"));
 
   if (Number.isNaN(maxAge) || maxAge <= 0) {
     return {
       ...base,
       value,
       status: "fail",
-      summary: Number.isNaN(maxAge) ? "max-age is missing or invalid." : "max-age=0 disables HSTS.",
+      summary: Number.isNaN(maxAge) ? msg("check.hsts.maxAgeInvalid") : msg("check.hsts.maxAgeZero"),
       details,
-      recommendation: "Set max-age to at least 15552000 (6 months).",
+      recommendation: msg("check.hsts.maxAgeRec"),
     };
   }
   const days = Math.round(maxAge / 86_400);
@@ -139,22 +172,22 @@ export const checkHsts: Check = (r) => {
       ...base,
       value,
       status: "warn",
-      summary: `max-age is short (${days} day${days === 1 ? "" : "s"}).`,
+      summary: msg("check.hsts.short", { days }),
       details,
-      recommendation: "Increase max-age to at least 15552000 (6 months).",
+      recommendation: msg("check.hsts.shortRec"),
     };
   }
-  return { ...base, value, status: "pass", summary: `Enabled for ${days} days.`, details };
+  return { ...base, value, status: "pass", summary: msg("check.hsts.pass", { days }), details };
 };
 
 // ---------------------------------------------------------------------------
 // Content
 // ---------------------------------------------------------------------------
 
-export const checkCsp: Check = (r) => {
+const csp: RawCheck = (r) => {
   const base = {
     id: "csp",
-    title: "Content-Security-Policy",
+    title: msg("check.csp.title"),
     category: "content" as const,
     weight: 25,
     reference: MDN + "Content-Security-Policy",
@@ -170,17 +203,17 @@ export const checkCsp: Check = (r) => {
         ...base,
         value: reportOnly,
         status: "warn",
-        summary: "Only a report-only policy is set.",
-        details: ["Report-only mode logs violations but does not block anything."],
-        recommendation: "Once the reports look clean, switch to the enforcing Content-Security-Policy header.",
+        summary: msg("check.csp.reportOnly"),
+        details: [msg("check.csp.reportOnlyDetail")],
+        recommendation: msg("check.csp.reportOnlyRec"),
       };
     }
     return {
       ...base,
       status: "fail",
-      summary: "Header is missing.",
-      details: ["CSP is the main browser defense against XSS and data injection."],
-      recommendation: "Add a CSP. Start with Content-Security-Policy-Report-Only to find breakage, then enforce.",
+      summary: msg("check.missing"),
+      details: [msg("check.csp.missingDetail")],
+      recommendation: msg("check.csp.missingRec"),
     };
   }
 
@@ -192,40 +225,40 @@ export const checkCsp: Check = (r) => {
       ...base,
       value,
       status: "warn",
-      summary: `Policy present but weak (${major.length} major issue${major.length > 1 ? "s" : ""}).`,
+      summary: msg("check.csp.weak", { count: major.length }),
       details,
-      recommendation: "Replace 'unsafe-inline'/'unsafe-eval' and broad sources with nonces or hashes.",
+      recommendation: msg("check.csp.weakRec"),
     };
   }
   return {
     ...base,
     value,
     status: "pass",
-    summary: issues.length ? "Policy present, with minor suggestions." : "Strong policy.",
+    summary: issues.length ? msg("check.csp.minor") : msg("check.csp.strong"),
     details,
   };
 };
 
-export const checkContentTypeOptions: Check = (r) => {
+const contentTypeOptions: RawCheck = (r) => {
   const value = getHeader(r.headers, "x-content-type-options");
   const base = {
     id: "xcto",
-    title: "X-Content-Type-Options",
+    title: msg("check.xcto.title"),
     category: "content" as const,
     weight: 10,
     reference: MDN + "X-Content-Type-Options",
     example: "X-Content-Type-Options: nosniff",
   };
   if (value?.trim().toLowerCase() === "nosniff") {
-    return { ...base, value, status: "pass", summary: "MIME sniffing is disabled.", details: [] };
+    return { ...base, value, status: "pass", summary: msg("check.xcto.pass"), details: [] };
   }
   return {
     ...base,
     value,
     status: "fail",
-    summary: value ? `Invalid value "${value}".` : "Header is missing.",
-    details: ["Browsers may interpret uploaded files as scripts or HTML (MIME confusion)."],
-    recommendation: "Send X-Content-Type-Options: nosniff on every response.",
+    summary: value ? msg("check.xcto.invalid", { value }) : msg("check.missing"),
+    details: [msg("check.xcto.detail")],
+    recommendation: msg("check.xcto.rec"),
   };
 };
 
@@ -233,27 +266,26 @@ export const checkContentTypeOptions: Check = (r) => {
 // Framing / isolation
 // ---------------------------------------------------------------------------
 
-export const checkFraming: Check = (r) => {
+const framing: RawCheck = (r) => {
   const base = {
     id: "framing",
-    title: "Clickjacking protection",
+    title: msg("check.framing.title"),
     category: "framing" as const,
     weight: 15,
     reference: MDN + "Content-Security-Policy/frame-ancestors",
     example: "Content-Security-Policy: frame-ancestors 'self'",
   };
-  const csp = getHeader(r.headers, "content-security-policy");
-  const frameAncestors = csp ? parseCsp(csp).get("frame-ancestors") : undefined;
+  const cspValue = getHeader(r.headers, "content-security-policy");
+  const frameAncestors = cspValue ? parseCsp(cspValue).get("frame-ancestors") : undefined;
   if (frameAncestors) {
+    const wildcard = frameAncestors.includes("*");
     return {
       ...base,
       value: `frame-ancestors ${frameAncestors.join(" ")}`,
-      status: frameAncestors.includes("*") ? "warn" : "pass",
-      summary: frameAncestors.includes("*")
-        ? "frame-ancestors allows any site to embed this page."
-        : "Controlled via CSP frame-ancestors.",
+      status: wildcard ? "warn" : "pass",
+      summary: wildcard ? msg("check.framing.wildcard") : msg("check.framing.viaCsp"),
       details: [],
-      recommendation: frameAncestors.includes("*") ? "Restrict frame-ancestors to 'self' or trusted origins." : undefined,
+      recommendation: wildcard ? msg("check.framing.wildcardRec") : undefined,
     };
   }
   const xfo = getHeader(r.headers, "x-frame-options");
@@ -263,8 +295,8 @@ export const checkFraming: Check = (r) => {
       ...base,
       value: xfo,
       status: "pass",
-      summary: `X-Frame-Options: ${v}.`,
-      details: ["Consider also adding CSP frame-ancestors, its modern replacement."],
+      summary: msg("check.framing.xfo", { value: v }),
+      details: [msg("check.framing.xfoDetail")],
     };
   }
   if (v?.startsWith("ALLOW-FROM")) {
@@ -272,26 +304,26 @@ export const checkFraming: Check = (r) => {
       ...base,
       value: xfo,
       status: "warn",
-      summary: "ALLOW-FROM is obsolete and ignored by modern browsers.",
+      summary: msg("check.framing.allowFrom"),
       details: [],
-      recommendation: "Use CSP frame-ancestors with the allowed origin instead.",
+      recommendation: msg("check.framing.allowFromRec"),
     };
   }
   return {
     ...base,
     value: xfo,
     status: "fail",
-    summary: xfo ? `Invalid X-Frame-Options value "${xfo}".` : "No frame-ancestors or X-Frame-Options.",
-    details: ["Any site can embed this page in an iframe and trick users into clicking (clickjacking)."],
-    recommendation: "Add CSP frame-ancestors 'self' (and optionally X-Frame-Options: SAMEORIGIN for old browsers).",
+    summary: xfo ? msg("check.framing.invalid", { value: xfo }) : msg("check.framing.none"),
+    details: [msg("check.framing.detail")],
+    recommendation: msg("check.framing.rec"),
   };
 };
 
-export const checkCoop: Check = (r) => {
+const coop: RawCheck = (r) => {
   const value = getHeader(r.headers, "cross-origin-opener-policy");
   const base = {
     id: "coop",
-    title: "Cross-Origin-Opener-Policy",
+    title: msg("check.coop.title"),
     category: "framing" as const,
     weight: 5,
     reference: MDN + "Cross-Origin-Opener-Policy",
@@ -299,15 +331,15 @@ export const checkCoop: Check = (r) => {
   };
   const v = value?.trim().toLowerCase();
   if (v === "same-origin" || v === "same-origin-allow-popups" || v === "noopener-allow-popups") {
-    return { ...base, value, status: "pass", summary: `Browsing context isolated (${v}).`, details: [] };
+    return { ...base, value, status: "pass", summary: msg("check.coop.pass", { value: v }), details: [] };
   }
   return {
     ...base,
     value,
     status: "warn",
-    summary: value ? `Weak value "${value}".` : "Header is missing.",
-    details: ["Cross-origin windows opened from this page keep a reference to it (XS-Leaks, tabnabbing)."],
-    recommendation: "Send Cross-Origin-Opener-Policy: same-origin (or same-origin-allow-popups if you rely on OAuth popups).",
+    summary: value ? msg("check.coop.weak", { value }) : msg("check.missing"),
+    details: [msg("check.coop.detail")],
+    recommendation: msg("check.coop.rec"),
   };
 };
 
@@ -324,11 +356,11 @@ const GOOD_REFERRER = new Set([
   "origin-when-cross-origin",
 ]);
 
-export const checkReferrerPolicy: Check = (r) => {
+const referrerPolicy: RawCheck = (r) => {
   const value = getHeader(r.headers, "referrer-policy");
   const base = {
     id: "referrer",
-    title: "Referrer-Policy",
+    title: msg("check.referrer.title"),
     category: "privacy" as const,
     weight: 10,
     reference: MDN + "Referrer-Policy",
@@ -338,48 +370,50 @@ export const checkReferrerPolicy: Check = (r) => {
     return {
       ...base,
       status: "warn",
-      summary: "Header is missing.",
-      details: ["Modern browsers default to strict-origin-when-cross-origin, but older ones may leak full URLs."],
-      recommendation: "Set the policy explicitly.",
+      summary: msg("check.missing"),
+      details: [msg("check.referrer.missingDetail")],
+      recommendation: msg("check.referrer.missingRec"),
     };
   }
   // The last recognized token wins (fallback syntax).
   const tokens = value.toLowerCase().split(",").map((t) => t.trim());
   const effective = [...tokens].reverse().find((t) => GOOD_REFERRER.has(t) || t === "unsafe-url" || t === "no-referrer-when-downgrade");
   if (effective && GOOD_REFERRER.has(effective)) {
-    return { ...base, value, status: "pass", summary: `Policy: ${effective}.`, details: [] };
+    return { ...base, value, status: "pass", summary: msg("check.referrer.pass", { policy: effective }), details: [] };
   }
   return {
     ...base,
     value,
     status: "warn",
-    summary: effective ? `"${effective}" leaks full URLs to other sites.` : `Unrecognized value "${value}".`,
-    details: ["Full URLs can contain tokens, search terms or other private data."],
-    recommendation: "Use strict-origin-when-cross-origin or stricter.",
+    summary: effective
+      ? msg("check.referrer.leaky", { policy: effective })
+      : msg("check.referrer.unrecognized", { value }),
+    details: [msg("check.referrer.detail")],
+    recommendation: msg("check.referrer.rec"),
   };
 };
 
-export const checkPermissionsPolicy: Check = (r) => {
+const permissionsPolicy: RawCheck = (r) => {
   const value = getHeader(r.headers, "permissions-policy");
   const legacy = getHeader(r.headers, "feature-policy");
   const base = {
     id: "permissions",
-    title: "Permissions-Policy",
+    title: msg("check.permissions.title"),
     category: "privacy" as const,
     weight: 5,
     reference: MDN + "Permissions-Policy",
     example: "Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()",
   };
   if (value) {
-    return { ...base, value, status: "pass", summary: "Browser features are restricted.", details: [] };
+    return { ...base, value, status: "pass", summary: msg("check.permissions.pass"), details: [] };
   }
   return {
     ...base,
     value: legacy,
     status: "warn",
-    summary: legacy ? "Only the deprecated Feature-Policy header is set." : "Header is missing.",
-    details: ["Injected or third-party code could request camera, microphone, geolocation, etc."],
-    recommendation: "Disable the browser features your site does not use.",
+    summary: legacy ? msg("check.permissions.legacyOnly") : msg("check.missing"),
+    details: [msg("check.permissions.detail")],
+    recommendation: msg("check.permissions.rec"),
   };
 };
 
@@ -387,51 +421,52 @@ export const checkPermissionsPolicy: Check = (r) => {
 // Cookies
 // ---------------------------------------------------------------------------
 
-export const checkCookies: Check = (r) => {
-  const cookies = getSetCookies(r.headers).map(parseSetCookie);
+const cookies: RawCheck = (r) => {
+  const parsed = getSetCookies(r.headers).map(parseSetCookie);
   const base = {
     id: "cookies",
-    title: "Cookie flags",
+    title: msg("check.cookies.title"),
     category: "cookies" as const,
     weight: 15,
     reference: MDN + "Set-Cookie",
     example: "Set-Cookie: session=…; Path=/; Secure; HttpOnly; SameSite=Lax",
   };
-  if (cookies.length === 0) {
-    return { ...base, weight: 0, status: "info", summary: "No cookies set on this response.", details: [] };
+  if (parsed.length === 0) {
+    return { ...base, weight: 0, status: "info", summary: msg("check.cookies.none"), details: [] };
   }
-  const https = r.finalUrl.startsWith("https:");
+  const isHttps = r.finalUrl.startsWith("https:");
   let critical = 0;
   let minor = 0;
-  const details: string[] = [];
-  for (const c of cookies) {
-    const p = cookieProblems(c, https);
+  const details: Message[] = [];
+  for (const c of parsed) {
+    const p = cookieProblems(c, isHttps);
     critical += p.critical.length;
     minor += p.minor.length;
     const all = [...p.critical, ...p.minor];
-    details.push(all.length ? `${c.name}: ${all.join(", ")}` : `${c.name}: OK`);
+    details.push(
+      all.length ? msg("check.cookies.cookie", { name: c.name, problems: all }) : msg("check.cookies.ok", { name: c.name }),
+    );
   }
-  const n = cookies.length;
-  const label = `${n} cookie${n > 1 ? "s" : ""}`;
+  const count = parsed.length;
   if (critical > 0) {
     return {
       ...base,
       status: "fail",
-      summary: `${label}, some can leak over insecure connections.`,
+      summary: msg("check.cookies.fail", { count }),
       details,
-      recommendation: "Add Secure to every cookie; add HttpOnly and SameSite to session cookies.",
+      recommendation: msg("check.cookies.failRec"),
     };
   }
   if (minor > 0) {
     return {
       ...base,
       status: "warn",
-      summary: `${label}, some missing HttpOnly or SameSite.`,
+      summary: msg("check.cookies.warn", { count }),
       details,
-      recommendation: "Add HttpOnly to cookies JavaScript does not need to read, and set SameSite=Lax or Strict.",
+      recommendation: msg("check.cookies.warnRec"),
     };
   }
-  return { ...base, status: "pass", summary: `${label}, all properly flagged.`, details };
+  return { ...base, status: "pass", summary: msg("check.cookies.pass", { count }), details };
 };
 
 // ---------------------------------------------------------------------------
@@ -440,76 +475,85 @@ export const checkCookies: Check = (r) => {
 
 const LEAKY_HEADERS = ["x-powered-by", "x-aspnet-version", "x-aspnetmvc-version", "x-generator", "x-drupal-cache", "x-runtime"];
 
-export const checkDisclosure: Check = (r) => {
+const disclosure: RawCheck = (r) => {
   const base = {
     id: "disclosure",
-    title: "Information disclosure",
+    title: msg("check.disclosure.title"),
     category: "disclosure" as const,
     weight: 5,
     reference: "https://owasp.org/www-project-secure-headers/#div-headers",
   };
-  const details: string[] = [];
+  const details: Message[] = [];
   const server = getHeader(r.headers, "server");
-  if (server && /\d/.test(server)) details.push(`Server: ${server} (reveals a version number)`);
+  if (server && /\d/.test(server)) details.push(msg("check.disclosure.server", { value: server }));
   for (const h of LEAKY_HEADERS) {
     const v = getHeader(r.headers, h);
-    if (v) details.push(`${h}: ${v}`);
+    if (v) details.push(msg("check.disclosure.header", { name: h, value: v }));
   }
   if (details.length === 0) {
-    return { ...base, status: "pass", summary: "No technology or version details leaked.", details: [] };
+    return { ...base, status: "pass", summary: msg("check.disclosure.pass"), details: [] };
   }
   return {
     ...base,
     status: "warn",
-    summary: "Headers reveal the technology stack.",
+    summary: msg("check.disclosure.warn"),
     details,
-    recommendation:
-      "Remove or genericize these headers (e.g. server_tokens off in nginx, expose_php = Off in php.ini) so attackers can't match known CVEs.",
+    recommendation: msg("check.disclosure.rec"),
   };
 };
 
-export const checkLegacyXss: Check = (r) => {
+const legacyXss: RawCheck = (r) => {
   const value = getHeader(r.headers, "x-xss-protection");
   if (!value) return null;
   const enabled = value.trim().startsWith("1");
   return {
     id: "xxss",
-    title: "X-XSS-Protection",
+    title: msg("check.xxss.title"),
     category: "content",
     weight: 0,
     status: "info",
     value,
-    summary: enabled ? "Deprecated XSS auditor is enabled." : "Deprecated header, correctly disabled.",
-    details: enabled
-      ? ["The XSS auditor was removed from browsers and could itself introduce leaks. Rely on CSP instead."]
-      : [],
-    recommendation: enabled ? "Set X-XSS-Protection: 0 or remove the header." : undefined,
+    summary: enabled ? msg("check.xxss.enabled") : msg("check.xxss.disabled"),
+    details: enabled ? [msg("check.xxss.enabledDetail")] : [],
+    recommendation: enabled ? msg("check.xxss.rec") : undefined,
     reference: MDN + "X-XSS-Protection",
   };
 };
 
-export const checkCors: Check = (r) => {
+const cors: RawCheck = (r) => {
   const origin = getHeader(r.headers, "access-control-allow-origin");
   if (!origin) return null;
   const creds = getHeader(r.headers, "access-control-allow-credentials")?.toLowerCase() === "true";
   const wildcard = origin.trim() === "*";
   return {
     id: "cors",
-    title: "CORS",
+    title: msg("check.cors.title"),
     category: "content",
     weight: 0,
     status: "info",
     value: origin,
-    summary: wildcard ? "Any origin can read this response." : `Readable cross-origin by ${origin}.`,
+    summary: wildcard ? msg("check.cors.wildcard") : msg("check.cors.origin", { origin }),
     details: [
-      wildcard
-        ? "Fine for public assets and APIs; a problem if the page contains private data."
-        : "Make sure this origin is intended, not reflected from the request.",
-      ...(creds ? ["Access-Control-Allow-Credentials: true is set."] : []),
+      wildcard ? msg("check.cors.wildcardDetail") : msg("check.cors.originDetail"),
+      ...(creds ? [msg("check.cors.credentials")] : []),
     ],
     reference: MDN + "Access-Control-Allow-Origin",
   };
 };
+
+export const checkHttps = localized(https);
+export const checkTls = localized(tls);
+export const checkHsts = localized(hsts);
+export const checkCsp = localized(csp);
+export const checkFraming = localized(framing);
+export const checkContentTypeOptions = localized(contentTypeOptions);
+export const checkReferrerPolicy = localized(referrerPolicy);
+export const checkPermissionsPolicy = localized(permissionsPolicy);
+export const checkCoop = localized(coop);
+export const checkCookies = localized(cookies);
+export const checkDisclosure = localized(disclosure);
+export const checkLegacyXss = localized(legacyXss);
+export const checkCors = localized(cors);
 
 export const ALL_CHECKS: Check[] = [
   checkHttps,
@@ -527,6 +571,6 @@ export const ALL_CHECKS: Check[] = [
   checkCors,
 ];
 
-export function runChecks(r: FetchResult): CheckResult[] {
-  return ALL_CHECKS.map((c) => c(r)).filter((c): c is CheckResult => c !== null);
+export function runChecks(r: FetchResult, locale: Locale = DEFAULT_LOCALE): CheckResult[] {
+  return ALL_CHECKS.map((c) => c(r, locale)).filter((c): c is CheckResult => c !== null);
 }
