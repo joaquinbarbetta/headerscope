@@ -6,6 +6,8 @@ HeaderScope sends a single request to a URL, follows its redirects, and audits t
 
 ![HeaderScope report screenshot](docs/screenshot.png)
 
+Available in **English and Spanish**: switch with the EN/ES toggle in the header. The whole UI is translated, including every finding, detail and recommendation.
+
 ## What it checks
 
 | Check | What it looks for | Weight |
@@ -26,6 +28,15 @@ HeaderScope sends a single request to a URL, follows its redirects, and audits t
 
 **Scoring:** pass = full weight, warning = half, fail = 0; informational checks aren't scored. The score maps to a grade: A+ (≥95), A (≥85), B (≥70), C (≥55), D (≥40), F.
 
+## Languages (EN / ES)
+
+The app ships in English (default) and Spanish, without locale routes:
+
+- **Typed dictionaries** ([`en.ts`](src/lib/i18n/en.ts), [`es.ts`](src/lib/i18n/es.ts)). English is the source of truth; the Spanish dictionary is typed against it, so a missing key or a wrong parameter is a compile error. Tests also check both locales have the same keys.
+- **Checks emit messages, not strings.** Each check returns `{ key, params }` descriptors. `buildReport(input, result, locale)` renders them into strings, so the JSON API stays human-readable, and each check also carries the language-neutral `messages`. The UI renders from those, so switching language re-translates a report on screen without rescanning.
+- **Remembered in a cookie** (`hs-locale`), so the server renders the right language and `<html lang>` on the first paint, with no flash of English.
+- Header names, directives and code examples are never translated.
+
 ## Security of the scanner itself
 
 A tool that fetches arbitrary URLs on a server is a classic **SSRF** (Server-Side Request Forgery) vector: without protections, anyone could use it to reach `localhost`, internal services, or cloud metadata endpoints like `169.254.169.254`. HeaderScope defends against this in layers:
@@ -41,15 +52,15 @@ And it practices what it preaches: the app ships a **nonce-based strict CSP** (v
 ## Tech stack
 
 - [Next.js 16](https://nextjs.org/) (App Router, Route Handlers, Proxy) + TypeScript
-- Tailwind CSS v4
+- Tailwind CSS v4, IBM Plex Sans / Mono self-hosted via `next/font` (no external requests, so the strict CSP holds)
 - Node's `http`/`https`/`tls`/`dns` modules for low-level control over requests
-- [Vitest](https://vitest.dev/) — 70+ unit and integration tests
+- [Vitest](https://vitest.dev/) — 90+ unit and integration tests
 - GitHub Actions CI (lint, typecheck, tests, build)
 
 ## Getting started
 
 ```bash
-git clone https://github.com/<your-user>/headerscope.git
+git clone https://github.com/joaquinbarbetta/headerscope.git
 cd headerscope
 npm install
 npm run dev
@@ -70,10 +81,10 @@ Open http://localhost:3000.
 ```bash
 curl -X POST http://localhost:3000/api/scan \
   -H "Content-Type: application/json" \
-  -d '{"url": "example.com"}'
+  -d '{"url": "example.com", "lang": "es"}'
 ```
 
-Returns a JSON report with `grade`, `score`, `counts`, `checks[]`, raw `headers`, `redirects` and `tls` info.
+Returns a JSON report with `grade`, `score`, `counts`, `checks[]`, raw `headers`, `redirects` and `tls` info. `lang` is optional (`"en"` by default, or `"es"`) and sets the language of the check texts and error messages.
 
 ## Project structure
 
@@ -83,8 +94,12 @@ src/
 │   ├── api/scan/route.ts     # POST /api/scan — rate limit, validation, error mapping
 │   ├── page.tsx              # Landing page
 │   └── layout.tsx
-├── components/               # Scanner form, report, check cards
+├── components/               # Scanner form, report, check cards, language toggle
 ├── lib/
+│   ├── i18n/
+│   │   ├── en.ts / es.ts     # Typed dictionaries
+│   │   ├── index.ts          # Message type, translate()
+│   │   └── errors.ts         # Scan errors → translatable messages
 │   ├── scanner/
 │   │   ├── ssrf.ts           # URL + IP validation
 │   │   ├── fetcher.ts        # Safe HTTP client (redirects, TLS info)

@@ -8,7 +8,7 @@ import type { FetchResult, HeaderMap, Hop, TlsInfo } from "./types";
 
 export const MAX_REDIRECTS = 5;
 const TIMEOUT_MS = 8_000;
-const USER_AGENT = "SecHeadersScanner/1.0 (+https://github.com/)";
+const USER_AGENT = "SecHeadersScanner/1.0 (+https://github.com/joaquinbarbetta/headerscope)";
 
 export interface FetchOptions {
   /** Disable SSRF checks. Only for local tests. */
