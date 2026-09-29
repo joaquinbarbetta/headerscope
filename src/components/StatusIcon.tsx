@@ -1,11 +1,14 @@
-import type { Status } from "@/lib/scanner/types";
+"use client";
 
-export const STATUS_LABEL: Record<Status, string> = {
-  pass: "Pass",
-  warn: "Warning",
-  fail: "Fail",
-  info: "Info",
-};
+import type { Status } from "@/lib/scanner/types";
+import { useI18n } from "./I18nProvider";
+
+export const STATUS_KEY = {
+  pass: "status.pass",
+  warn: "status.warn",
+  fail: "status.fail",
+  info: "status.info",
+} as const satisfies Record<Status, string>;
 
 export const STATUS_TEXT: Record<Status, string> = {
   pass: "text-pass",
@@ -21,7 +24,29 @@ export const STATUS_BG: Record<Status, string> = {
   info: "bg-info/10 border-info/30",
 };
 
-export function StatusIcon({ status, className = "size-5" }: { status: Status; className?: string }) {
+/** Left accent stripe on check cards. */
+export const STATUS_STRIPE: Record<Status, string> = {
+  pass: "before:bg-pass",
+  warn: "before:bg-warn",
+  fail: "before:bg-fail",
+  info: "before:bg-info",
+};
+
+/**
+ * Status glyph. Each status has a distinct shape (not just a color), and a
+ * text label for screen readers unless `decorative` is set because the label
+ * is already visible next to it.
+ */
+export function StatusIcon({
+  status,
+  className = "size-5",
+  decorative = false,
+}: {
+  status: Status;
+  className?: string;
+  decorative?: boolean;
+}) {
+  const { t } = useI18n();
   const common = {
     className: `${className} ${STATUS_TEXT[status]} shrink-0`,
     viewBox: "0 0 20 20",
@@ -30,8 +55,7 @@ export function StatusIcon({ status, className = "size-5" }: { status: Status; c
     strokeWidth: 2,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
-    "aria-label": STATUS_LABEL[status],
-    role: "img",
+    ...(decorative ? { "aria-hidden": true } : { "aria-label": t(STATUS_KEY[status]), role: "img" }),
   };
   switch (status) {
     case "pass":
