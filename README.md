@@ -54,7 +54,7 @@ And it practices what it preaches: the app ships a **nonce-based strict CSP** (v
 ## Tech stack
 
 - [Next.js 16](https://nextjs.org/) (App Router, Route Handlers, Proxy) + TypeScript
-- Tailwind CSS v4, IBM Plex Sans / Mono self-hosted via `next/font` (no external requests, so the strict CSP holds)
+- Tailwind CSS v4, Space Grotesk + IBM Plex Sans / Mono self-hosted via `next/font` (no external requests, so the strict CSP holds)
 - Node's `http`/`https`/`tls`/`dns` modules for low-level control over requests
 - [Vitest](https://vitest.dev/) — 90+ unit and integration tests
 - GitHub Actions CI (lint, typecheck, tests, build)

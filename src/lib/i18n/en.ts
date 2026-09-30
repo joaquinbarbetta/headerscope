@@ -50,6 +50,27 @@ export const en = {
   "empty.subtitle": "13 checks, weighted by impact. Informational checks don't affect the grade.",
   "empty.weight": (p: { weight: number }) => `${p.weight} pts`,
   "empty.info": "info",
+  "empty.eyebrow": "Check catalog",
+  "empty.carouselLabel": "Available checks, scrollable horizontally",
+  "empty.prev": "Show previous checks",
+  "empty.next": "Show next checks",
+  "feature.request.title": "One request, zero noise",
+  "feature.request.body": "A single GET that reads headers only. No crawling, no page body, no cookies kept.",
+  "feature.ssrf.title": "Hardened by design",
+  "feature.ssrf.body": "Every redirect hop is re-validated against private and reserved IPs, so the scanner can't be turned inward.",
+  "feature.fix.title": "Fixes you can paste",
+  "feature.fix.body": "Each finding explains the risk and comes with a ready-to-use header example.",
+  "preview.label": "Sample report",
+  "preview.host": "your-site.dev",
+
+  // -------------------------------------------------------------------------
+  // Categories (report tabs)
+  // -------------------------------------------------------------------------
+  "category.all": "All",
+  "category.transport": "Transport",
+  "category.content": "Content",
+  "category.cookies": "Cookies",
+  "category.privacy": "Privacy",
 
   // -------------------------------------------------------------------------
   // Report
@@ -77,6 +98,11 @@ export const en = {
   "report.downloadJson": "Download JSON",
   "report.rawHeaders": (p: { count: number }) => `Raw response headers (${p.count})`,
   "report.noChecks": "No checks with this status.",
+  "report.tabsLabel": "Check categories",
+  "report.breakdown": "Score by category",
+  "report.categoryScore": (p: { category: string; score: number }) => `${p.category}: ${p.score} out of 100`,
+  "report.findings": "Findings",
+  "report.scanned": (p: { date: string }) => `Scanned ${p.date}`,
   "card.observed": "Observed value",
   "card.howToFix": "How to fix",
   "card.example": "Example",

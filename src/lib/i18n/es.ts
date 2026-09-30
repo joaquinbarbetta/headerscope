@@ -48,6 +48,28 @@ export const es: Dictionary = {
   "empty.subtitle": "13 chequeos, ponderados según su impacto. Los informativos no afectan la nota.",
   "empty.weight": (p) => `${p.weight} pts`,
   "empty.info": "info",
+  "empty.eyebrow": "Catálogo de chequeos",
+  "empty.carouselLabel": "Chequeos disponibles, con desplazamiento horizontal",
+  "empty.prev": "Ver los chequeos anteriores",
+  "empty.next": "Ver los chequeos siguientes",
+  "feature.request.title": "Una petición, cero ruido",
+  "feature.request.body": "Un único GET que solo lee headers. Sin crawling, sin el cuerpo de la página, sin guardar cookies.",
+  "feature.ssrf.title": "Blindado por diseño",
+  "feature.ssrf.body":
+    "Cada salto de redirección se vuelve a validar contra IPs privadas y reservadas, así el scanner no puede apuntar hacia adentro.",
+  "feature.fix.title": "Correcciones listas para pegar",
+  "feature.fix.body": "Cada hallazgo explica el riesgo y trae un ejemplo de header listo para usar.",
+  "preview.label": "Reporte de ejemplo",
+  "preview.host": "tu-sitio.dev",
+
+  // -------------------------------------------------------------------------
+  // Categories (report tabs)
+  // -------------------------------------------------------------------------
+  "category.all": "Todos",
+  "category.transport": "Transporte",
+  "category.content": "Contenido",
+  "category.cookies": "Cookies",
+  "category.privacy": "Privacidad",
 
   // -------------------------------------------------------------------------
   // Report
@@ -75,6 +97,11 @@ export const es: Dictionary = {
   "report.downloadJson": "Descargar JSON",
   "report.rawHeaders": (p) => `Headers de la respuesta (${p.count})`,
   "report.noChecks": "No hay chequeos con este estado.",
+  "report.tabsLabel": "Categorías de chequeos",
+  "report.breakdown": "Puntaje por categoría",
+  "report.categoryScore": (p) => `${p.category}: ${p.score} de 100`,
+  "report.findings": "Hallazgos",
+  "report.scanned": (p) => `Escaneado el ${p.date}`,
   "card.observed": "Valor observado",
   "card.howToFix": "Cómo solucionarlo",
   "card.example": "Ejemplo",

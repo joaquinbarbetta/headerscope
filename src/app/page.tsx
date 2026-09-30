@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { Hero, SiteFooter, SiteHeader } from "@/components/Chrome";
+import { SiteFooter, SiteHeader } from "@/components/Chrome";
 import { Scanner } from "@/components/Scanner";
 
 export default async function Home() {
@@ -9,8 +9,7 @@ export default async function Home() {
   return (
     <>
       <SiteHeader />
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 pb-20 pt-12 outline-none sm:px-6 sm:pt-20">
-        <Hero />
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-12 outline-none sm:px-6 sm:pt-20">
         <Scanner />
       </main>
       <SiteFooter />

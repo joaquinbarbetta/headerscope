@@ -28,7 +28,7 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
   return (
     <li
       style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
-      className={`relative animate-fade-up overflow-hidden rounded-xl border border-line bg-panel transition-colors duration-200 before:absolute before:inset-y-0 before:left-0 before:w-[3px] ${STATUS_STRIPE[check.status]} ${open ? "border-line-strong" : "hover:border-line-strong"}`}
+      className={`relative animate-fade-up overflow-hidden rounded-2xl border border-line bg-panel transition-[border-color,box-shadow] duration-300 before:absolute before:inset-y-0 before:left-0 before:w-[3px] ${STATUS_STRIPE[check.status]} ${open ? "border-line-strong shadow-[0_18px_40px_-28px_rgb(0_0_0/0.8)]" : "hover:border-line-strong"}`}
     >
       <h3>
         <button
@@ -37,12 +37,12 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
           aria-expanded={hasBody ? open : undefined}
           aria-controls={hasBody ? panelId : undefined}
           disabled={!hasBody}
-          className={`flex w-full items-start gap-3 py-4 pl-5 pr-4 text-left transition-colors duration-200 ${hasBody ? "cursor-pointer hover:bg-panel-2/60" : "cursor-default"}`}
+          className={`flex w-full items-start gap-3 py-4 pl-5 pr-4 text-left transition-colors duration-200 ${hasBody ? "cursor-pointer hover:bg-panel-2/70" : "cursor-default"}`}
         >
           <StatusIcon status={check.status} className="mt-0.5 size-5" decorative />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="font-medium tracking-tight text-ink">{tm(messages.title)}</span>
+              <span className="font-display text-[17px] font-semibold tracking-tight text-ink">{tm(messages.title)}</span>
               <span
                 className={`rounded-md border px-1.5 py-px font-mono text-[11px] font-medium uppercase tracking-wider ${STATUS_BG[check.status]} ${STATUS_TEXT[check.status]}`}
               >
@@ -76,11 +76,11 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
           className={`grid transition-[grid-template-rows] duration-300 ease-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
         >
           <div className="overflow-hidden">
-            <div className="space-y-4 border-t border-line px-5 pb-5 pt-4 text-sm sm:pl-13">
+            <div className="space-y-4 border-t border-line bg-bg/25 px-5 pb-5 pt-4 text-sm sm:pl-13">
               {check.value && (
                 <div>
                   <div className="mb-1.5 font-mono text-[11px] uppercase tracking-wider text-muted">{t("card.observed")}</div>
-                  <code className="block break-all rounded-lg border border-line bg-bg px-3 py-2 font-mono text-xs leading-relaxed text-ink/90">
+                  <code className="block break-all rounded-xl border border-line bg-bg px-3 py-2 font-mono text-xs leading-relaxed text-ink/90">
                     {check.value}
                   </code>
                 </div>
@@ -96,7 +96,7 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
                 </ul>
               )}
               {messages.recommendation && (
-                <div className="rounded-lg border border-accent/25 bg-accent/[0.06] px-3.5 py-2.5 leading-relaxed">
+                <div className="rounded-xl border border-accent/25 bg-accent/[0.07] px-3.5 py-2.5 leading-relaxed">
                   <span className="font-medium text-accent">{t("card.howToFix")}: </span>
                   {tm(messages.recommendation)}
                 </div>
@@ -109,7 +109,7 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
                       type="button"
                       onClick={copyExample}
                       aria-label={t("card.copyLabel")}
-                      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted transition-colors duration-200 hover:bg-panel-2 hover:text-ink"
+                      className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs text-muted transition-colors duration-200 hover:bg-panel-3 hover:text-ink"
                     >
                       <svg className="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden>
                         {copied ? (
@@ -124,7 +124,7 @@ export function CheckCard({ check, index = 0 }: { check: CheckResult; index?: nu
                       <span aria-live="polite">{copied ? t("card.copied") : t("card.copy")}</span>
                     </button>
                   </div>
-                  <pre className="overflow-x-auto rounded-lg border border-line bg-bg px-3 py-2.5 font-mono text-xs leading-relaxed text-accent">
+                  <pre className="overflow-x-auto rounded-xl border border-line bg-bg px-3 py-2.5 font-mono text-xs leading-relaxed text-accent">
                     <code className="whitespace-pre-wrap break-words">{check.example}</code>
                   </pre>
                 </div>

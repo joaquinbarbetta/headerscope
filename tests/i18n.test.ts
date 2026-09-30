@@ -156,8 +156,8 @@ describe("error messages", () => {
 
 describe("check catalog", () => {
   it("matches the checks the scanner actually runs", () => {
-    const ran = runChecks(WEAK).map((c) => ({ id: c.id, weight: c.weight }));
-    expect(ran).toEqual(CHECK_CATALOG.map((c) => ({ id: c.id, weight: c.weight })));
+    const ran = runChecks(WEAK).map((c) => ({ id: c.id, weight: c.weight, category: c.category }));
+    expect(ran).toEqual(CHECK_CATALOG.map((c) => ({ id: c.id, weight: c.weight, category: c.category })));
   });
 
   it("has a description for every check in every locale", () => {

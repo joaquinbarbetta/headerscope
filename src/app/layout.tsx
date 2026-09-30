@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { cookies } from "next/headers";
 import { I18nProvider } from "@/components/I18nProvider";
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale, translate, type Locale } from "@/lib/i18n";
@@ -17,6 +17,11 @@ const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-plex-mono",
+  display: "swap",
+});
+const grotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-grotesk",
   display: "swap",
 });
 
@@ -37,7 +42,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await requestLocale();
 
   return (
-    <html lang={locale} className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
+    <html lang={locale} className={`${plexSans.variable} ${plexMono.variable} ${grotesk.variable} h-full antialiased`}>
       <body className="flex min-h-dvh flex-col">
         <div className="backdrop" aria-hidden />
         <I18nProvider initialLocale={locale}>{children}</I18nProvider>
